@@ -35,8 +35,8 @@ def poisson_equation_n_side(x_info, V_info): #x=0 is interface to x=x_n is n_sid
     dV_deriv = -(math.exp(V) - math.exp(-V) - (Nd/ni))
     return [V_deriv, dV_deriv]
 
-#I ended up not using the function below    
-def poisson_equation_p_side(x_info, V_info): #x=0 is interface to x=(x_n + x_p) is p_side boundary
+#I ended up not using the function below based on assumptions about the symnetry of the device   
+def poisson_equation_p_side(x_info, V_info): #x=x_n is interface to x=(x_n + x_p) is p_side boundary
     V = V_info[0]
     dV = V_info[1]
     V_deriv = dV
@@ -110,7 +110,7 @@ def calculate_f_list(var_list):
     return f_list
 
 #f_list = calculate_f_list(var_list_p)
-solution = root(calculate_f_list, var_list_p) #It works! Print solution for more info about method, number of function evaluations, etc.
+solution = root(calculate_f_list, var_list_p) #Print solution for more info about method, number of function evaluations, etc.
 var_list = solution.x
 
 x_p_side = []
@@ -183,21 +183,3 @@ ax[2].plot(final_x, p)
 ax[2].set_yscale('log')
 ax[2].set_xlabel('Position (cm)')
 ax[2].set_ylabel('Electron and Hole Concentrations (cm^-1)')
-
-
-
-
-    
-
-
-
-    
-    
-
-
-
-
-
-    
-    
-    
