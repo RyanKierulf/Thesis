@@ -2,7 +2,7 @@
 Author: Ryan Kierulf
 Date: January 20th, 2021
 
-This program solves for the potential of a silicon PN junction under equilibirum conditions, and plots the potential, eletric field, electron and hole concentrations, and conduction and valence band energies 
+This program solves for the potential of a silicon PN junction under equilibirum conditions, and plots the potential, electric field, electron and hole concentrations, and conduction and valence band energies 
 across the device. The method used to solve the poisson-equation two-point boundary value problem is the multiple shooting method with a bidirectional shooting approach; x=0 is set as the interface between 
 the p-side and n-side, and numerical integration is used to go from x=0 to the p-side boundary and from x=0 to the n-side boundary, with a specified number of intervals (I used 20) on each the p and n-side. 
 Conditions enforced to form a solution are: continuity of V(x) and dV/dx on each side of the device, continuity of V(x) and dV/dx at the interface, and satisfaction of the dirilecht boundary conditions. 
@@ -127,7 +127,7 @@ for i in range(len(points_n_side)):
 #   sol = solve_ivp(poisson_equation_n_side, (points_n_side[i], points_n_side[i+1]), [V_points_initial_n[i], dV_points_initial_n[i]], method = 'BDF')
 #   plt.plot(sol.t, sol.y[0,:])
     
-##List of all variables that must be solved for
+#List of all variables that must be solved for
 #var_list[0: 2*num_intervals_p_side] = [V[points_p_side[0]], dV[points_p_side[0]], V[points_p_side[1], dV[points_p_side[1]], ... up to but not including points at boundary]
 #var_list[2*num_intervals_p_side: 2*(num_intervals_p_side+num_intervals_n_side)] = [V[points_n_side[0]], dV[points_n_side[0]], V[points_n_side[1], dV[points_n_side[1]], ... up to but not including points at boundary]
 #Initial list of variables, based on initial guess:
