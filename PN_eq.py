@@ -163,7 +163,6 @@ def calculate_f_list(var_list):
     return f_list
 
 #Now solve:
-f_list = calculate_f_list(var_list)
 solution = root(calculate_f_list, var_list) #Print solution for more info about method, number of function evaluations, etc.
 var_list = solution.x
 
