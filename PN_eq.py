@@ -76,7 +76,6 @@ for i in range(len(points_n)):
 for i in range(len(points_p)):
     points_p_side.append((x_p/Ldi) - (points_p[i] * x_p/Ldi))
 
-
 #Initial Guess p-side:
 #Guess that potential is zero at interface, exponentially decays to negative boundary value and has decreased by 75% when 1/10 distance across the p_side of the device
 #Only two points are needed to fit exponential function y = a * Exp(-b * x)
@@ -111,8 +110,7 @@ dV_points_initial_n = []
 for i in range(len(points_n_side)):
     V_points_initial_n.append(initial_guess_V_n_side(points_n_side[i]))
     dV_points_initial_n.append(initial_guess_dV_n_side(points_n_side[i]))
-
-  
+ 
 #Uncomment to plot initial V and dV, and piecewise IVP solutions resulting from initial guess
 #plt.plot(points_p_side, V_points_initial_p)
 #plt.plot(points_p_side, dV_points_initial_p)
@@ -120,8 +118,8 @@ for i in range(len(points_n_side)):
 #plt.plot(points_n_side, dV_points_initial_n)
     
 #for i in range(num_intervals_p_side):
-#    sol = solve_ivp(poisson_equation_p_side, (points_p_side[i], points_p_side[i+1]), [V_points_initial_p[i], dV_points_initial_p[i]], method = 'BDF')
-#    plt.plot(sol.t, sol.y[0,:])
+#   sol = solve_ivp(poisson_equation_p_side, (points_p_side[i], points_p_side[i+1]), [V_points_initial_p[i], dV_points_initial_p[i]], method = 'BDF')
+#   plt.plot(sol.t, sol.y[0,:])
     
 #for i in range(num_intervals_n_side):
 #   sol = solve_ivp(poisson_equation_n_side, (points_n_side[i], points_n_side[i+1]), [V_points_initial_n[i], dV_points_initial_n[i]], method = 'BDF')
@@ -130,7 +128,7 @@ for i in range(len(points_n_side)):
 #List of all variables that must be solved for
 #var_list[0: 2*num_intervals_p_side] = [V[points_p_side[0]], dV[points_p_side[0]], V[points_p_side[1], dV[points_p_side[1]], ... up to but not including points at boundary]
 #var_list[2*num_intervals_p_side: 2*(num_intervals_p_side+num_intervals_n_side)] = [V[points_n_side[0]], dV[points_n_side[0]], V[points_n_side[1], dV[points_n_side[1]], ... up to but not including points at boundary]
-#Initial list of variables, based on initial guess:
+#Values of list of variables, based on initial guess:
 var_list = np.zeros(2 * (num_intervals_p_side + num_intervals_n_side)) 
 for i in range(num_intervals_p_side + 1):
     var_list[(2*i)-2] = V_points_initial_p[i]
