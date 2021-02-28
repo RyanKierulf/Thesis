@@ -166,7 +166,7 @@ for i in range(1, num_intervals_n_side + 1):
 #interval, and the method to be used. Returns an array, y, of dimensions
 #(number of x points, number of dependent variables). solution.y[0,-1] refers
 #to the computed value of v at the end of the interval, solution.y[1,-1]
-#refers to the computed value of dx/dx at the end of the interval
+#refers to the computed value of dv/dx at the end of the interval
 #****************************************************************************#
 def calculate_f_list(var_list):
     f_list = np.zeros(2 * (num_intervals_p_side + num_intervals_n_side)) 
