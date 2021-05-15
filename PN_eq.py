@@ -22,6 +22,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
 from scipy.optimize import root
+import csv
 
 #Physical constants
 Q = 1.60217662E-19 #Charge of electron
@@ -46,6 +47,8 @@ n_a = 1E16 #Doping concentration, p-side
 n_d = 1E16 #Doping concentration, n-side
 x_n = 500E-7 #Length of n-side, cm
 x_p = 500E-7 #Length of p-side, cm
+
+#Boundary conditions (scaled)
 v_boundary_n = math.log(n_a/NI) #Boundary condition on n-side of device
 v_boundary_p = -math.log(n_d/NI) #Boundary condition on p-side of device
 
@@ -148,14 +151,14 @@ for i in range(len(points_n_side)):
 #dV[points_n_side[1]], ... up to but not including points at boundary]
 #****************************************************************************#    
 var_list = np.zeros(2 * (num_intervals_p_side + num_intervals_n_side)) 
-for i in range(num_intervals_p_side + 1):
-    var_list[(2*i)-2] = v_points_initial_p[i]
-    var_list[(2*i)-1] = dV_points_initial_p[i]
+for i in range(num_intervals_p_side):
+    var_list[(2*i)] = v_points_initial_p[i]
+    var_list[(2*i)+1] = dV_points_initial_p[i]
 offset = num_intervals_p_side * 2
-for i in range(1, num_intervals_n_side + 1):
-    var_list[(2*i)-2+offset] = v_points_initial_n[i]
-    var_list[(2*i)-1+offset] = dV_points_initial_n[i]    
-
+for i in range(num_intervals_n_side):
+    var_list[(2*i)+offset] = v_points_initial_n[i]
+    var_list[(2*i)+1+offset] = dV_points_initial_n[i]    
+                                           
 #****************************************************************************#
 #List of functions that must be equal to zero, from subtracting RHS from 
 #each equation
@@ -166,7 +169,7 @@ for i in range(1, num_intervals_n_side + 1):
 #interval, and the method to be used. Returns an array, y, of dimensions
 #(number of x points, number of dependent variables). solution.y[0,-1] refers
 #to the computed value of v at the end of the interval, solution.y[1,-1]
-#refers to the computed value of dv/dx at the end of the interval
+#refers to the computed value of dx/dx at the end of the interval
 #****************************************************************************#
 def calculate_f_list(var_list):
     f_list = np.zeros(2 * (num_intervals_p_side + num_intervals_n_side)) 
@@ -205,7 +208,7 @@ def calculate_f_list(var_list):
     return f_list
 
 #Solve all necessary equations:
-solution = root(calculate_f_list, var_list) #Print solution for more info
+solution = root(calculate_f_list, var_list, method='hybr') #Print solution for more info
 var_list = solution.x
 
 #****************************************************************************#
@@ -221,7 +224,8 @@ dV_n_side = []
 
 for i in range(num_intervals_p_side):
     sol = solve_ivp(poisson_equation_p_side, (points_p_side[i], 
-        points_p_side[i+1]), [var_list[(2*i)], var_list[(2*i)+1]], method = 'BDF')
+        points_p_side[i+1]), [var_list[(2*i)], var_list[(2*i)+1]], 
+        method = 'BDF')
     for j in range(sol.t.shape[0]):
         x_p_side.append(sol.t[j])
         v_p_side.append(sol.y[0,j])
@@ -302,3 +306,18 @@ ax2[1].plot(final_x, v_band, 'm-', label = 'Valence Band')
 ax2[1].legend(loc = 'upper left')
 ax2[1].set_xlabel('Position (nm)')
 ax2[1].set_ylabel('Band Energies (eV)')
+
+#****************************************************************************#
+#Finally, write data to csv files so it can be used for initial guess in the
+#nonequilibrium program. Need to write data for x, V, n, and p. Since variable
+#scaling is again used in the nonequilibrium program, I will rescale the
+#V and x and apply scaling to n and p to make things easier.
+#****************************************************************************#
+with open('equilibrium_scaled_result.csv', mode='w') as result_file:
+    result_writer = csv.writer(result_file, delimiter=',')
+
+    #Change values to arrays so they can be multiplied by a scalar
+    result_writer.writerow(np.array(final_x) * ((1E-7)/ldi))
+    result_writer.writerow(np.array(final_V) * (1/vt)) 
+    result_writer.writerow(np.array(n) * (1/NI))
+    result_writer.writerow(np.array(p) * (1/NI))
