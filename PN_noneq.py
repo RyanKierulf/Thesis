@@ -34,13 +34,19 @@ T = 300 #Room temperature, kelvin
 NI = 1.45E10 #Intrinsic carrier concentration, silicon
 BAND_GAP = 1.12 #Energy band gap for silicon at 300K
 RNC = 2.8E19;  #Silicon effective density of states, condunction band
+DIFF_N = 36 #Silicon electron diffusion vconstant
+DIFF_P = 12 #Silicon hole diffusion constant
 
 #Physical Quantities
 eps = KS * E0
 eps = 1.05E-12 #Need to fix this: calculated version of eps in previous line is incorrect
 vt  = KB*T/Q #Thermal voltage
 ldi = math.sqrt(eps*vt/(Q*NI)) #Intrinsic debye length
-dec = vt * math.log(RNC/NI) 
+dec = vt * math.log(RNC/NI) #Difference between conduction band and fermi potential
+MU_N = DIFF_N/vt #Silicon electron mobility
+MU_P = DIFF_P/vt #Silicon hole mobility
+TAU_N = 1E-6 #Silicon electron recombination lifetime
+TAU_P = 1E-6 #Silicon hole recombination lifetime
 
 #Device parameters
 n_a = 1E16 #Doping concentration, p-side
@@ -49,7 +55,8 @@ x_n = 500E-7 #Length of n-side, cm
 x_p = 500E-7 #Length of p-side, cm
 v_app = 0.00 #Applied voltage
 
-#Boundary Conditions (scaled), more accurate calculation can be done later
+
+#Boundary Conditions (scaled)
 vb = vt * math.log(n_a * n_d / (NI ** 2)) #Built in voltage
 v_boundary_n = (vb - v_app)/vt
 n_boundary_n = n_a/NI
@@ -57,6 +64,15 @@ p_boundary_n = (1/n_boundary_n)
 v_boundary_p = 0
 p_boundary_p = n_d/NI
 n_boundary_p = (1/p_boundary_p)
+
+
+def u_n(n_bar, p_bar):
+    return ((ldi ** 2) / (DIFF_N)) * (n_bar * p_bar - 1) / (TAU_N*(p_bar+1) + TAU_P*(n_bar+1))
+    
+    
+def u_p(n_bar, p_bar):
+    return ((ldi ** 2) / (DIFF_P)) * (n_bar * p_bar - 1) / (TAU_N*(p_bar+1) + TAU_P*(n_bar+1))
+
 
 def equations_n_side(x, info):
     #************************************************************************#
@@ -76,9 +92,9 @@ def equations_n_side(x, info):
     du1 = u2
     du2 = u3 - u5 - (n_d/NI)
     du3 = u4
-    du4 = (u4 * u2) + (u3 * (u3 - u5 - (n_d/NI)))
+    du4 = (u4 * u2) + (u3 * (u3 - u5 - (n_d/NI))) #+ u_n(u3, u5)
     du5 = u6
-    du6 = (-u6 * u2) - (u5 * (u3 - u5 - (n_d/NI)))
+    du6 = (-u6 * u2) - (u5 * (u3 - u5 - (n_d/NI))) #+ u_p(u3, u5)
     return [du1, du2, du3, du4, du5, du6]
 
 def equations_p_side(x, info):
@@ -99,9 +115,9 @@ def equations_p_side(x, info):
     du1 = u2
     du2 = u3 - u5 + (n_a/NI)
     du3 = u4
-    du4 = (u4 * u2) + (u3 * (u3 - u5 + (n_a/NI)))
+    du4 = (u4 * u2) + (u3 * (u3 - u5 + (n_a/NI))) #+ u_n(u3, u5)
     du5 = u6
-    du6 = (-u6 * u2) - (u5 * (u3 - u5 + (n_a/NI)))
+    du6 = (-u6 * u2) - (u5 * (u3 - u5 + (n_a/NI))) #+ u_p(u3, u5)
     return [du1, du2, du3, du4, du5, du6]
     
 #****************************************************************************#
@@ -195,36 +211,6 @@ for i in range(len(points_n_side) - 1):
     dp_points_initial_n.append((p_initial((x_p/ldi)-points_n_side[i]) - 
         p_initial((x_p/ldi)-points_n_side[i]+dx))/dx)
 
-"""
-sol_list = []
-for i in range(len(points_p_side)-1):
-    var_interval_start = [v_points_initial_p[i], dv_points_initial_p[i], 
-        n_points_initial_p[i], dn_points_initial_p[i], p_points_initial_p[i], 
-        dp_points_initial_p[i]]
-    sol = solve_ivp(equations_n_side, (points_p_side[i], points_p_side[i+1]),
-        var_interval_start, method = 'BDF')
-    sol_list.append(sol)
-
-v_plot = []
-p_plot = []
-x_plot = []    
-for i in range(len(sol_list)):
-    for j in range(sol_list[i].t.shape[0]):
-        x_plot.append(sol_list[i].t[j])
-        p_plot.append(sol_list[i].y[4,j])
-        v_plot.append(sol_list[i].y[0,j])
-    
-
-fig, ax1 = plt.subplots(2)
-fig.set_figheight(10)
-fig.set_figwidth(15)
-
-ax1[0].plot(x_plot, p_plot)
-ax1[0].set_yscale('log')
-ax1[1].plot(x_plot, v_plot)
-#ax1[1].set_yscale('log') 
-"""
-
 #****************************************************************************#
 #List of all variables that must be solved for: contains values of dependent
 #variables on the p-side, followed by their values on the n-side, stored in
@@ -259,18 +245,14 @@ def calculate_f_list(var_list):
     for i in range(num_intervals_p_side-1):
         interval_start_values = [var_list[6*i], var_list[(6*i)+1], var_list[(6*i)+2],
             var_list[(6*i)+3], var_list[(6*i)+4], var_list[(6*i)+5]]
-        f_list[6*i] = solve_ivp(equations_p_side, (points_p_side[i], points_p_side[i+1]),
-            interval_start_values, method = 'BDF').y[0,-1] - var_list[(6*i)+6]
-        f_list[(6*i)+1] = solve_ivp(equations_p_side, (points_p_side[i], points_p_side[i+1]),
-            interval_start_values, method = 'BDF').y[1,-1] - var_list[(6*i)+7]
-        f_list[(6*i)+2] = solve_ivp(equations_p_side, (points_p_side[i], points_p_side[i+1]),
-            interval_start_values, method = 'BDF').y[2,-1] - var_list[(6*i)+8]
-        f_list[(6*i)+3] = solve_ivp(equations_p_side, (points_p_side[i], points_p_side[i+1]),
-            interval_start_values, method = 'BDF').y[3,-1] - var_list[(6*i)+9]
-        f_list[(6*i)+4] = (solve_ivp(equations_p_side, (points_p_side[i], points_p_side[i+1]),
-            interval_start_values, method = 'BDF').y[4,-1] - var_list[(6*i)+10])/1000
-        f_list[(6*i)+5] = (solve_ivp(equations_p_side, (points_p_side[i], points_p_side[i+1]),
-            interval_start_values, method = 'BDF').y[5,-1] - var_list[(6*i)+11])/1000
+        sol = solve_ivp(equations_p_side, (points_p_side[i], points_p_side[i+1]),
+            interval_start_values, method = 'BDF')
+        f_list[6*i] = sol.y[0,-1] - var_list[(6*i)+6]
+        f_list[(6*i)+1] = sol.y[1,-1] - var_list[(6*i)+7]
+        f_list[(6*i)+2] = sol.y[2,-1] - var_list[(6*i)+8]
+        f_list[(6*i)+3] = sol.y[3,-1] - var_list[(6*i)+9]
+        f_list[(6*i)+4] = (sol.y[4,-1] - var_list[(6*i)+10])/100
+        f_list[(6*i)+5] = (sol.y[5,-1] - var_list[(6*i)+11])/100
     #Boundary conditions p-side
     interval_start_values = [var_list[6*(num_intervals_p_side-1)], 
         var_list[6*(num_intervals_p_side-1)+1], var_list[6*(num_intervals_p_side-1)+2],
@@ -284,7 +266,7 @@ def calculate_f_list(var_list):
         interval_start_values, method = 'BDF').y[2,-1] - n_boundary_p
     f_list[6*(num_intervals_p_side-1)+2] = (solve_ivp(equations_p_side, 
         (points_p_side[num_intervals_p_side-1], points_p_side[num_intervals_p_side]), 
-        interval_start_values, method = 'BDF').y[4,-1] - p_boundary_p)/1000    
+        interval_start_values, method = 'BDF').y[4,-1] - p_boundary_p)/100    
     #Continuity equations at interface
     f_list[6*(num_intervals_p_side-1)+3] = var_list[0] - var_list[6*num_intervals_p_side]
     f_list[6*(num_intervals_p_side-1)+4] = var_list[1] + var_list[6*num_intervals_p_side+1]
@@ -299,18 +281,14 @@ def calculate_f_list(var_list):
         interval_start_values = [var_list[(6*i)+v_offset], var_list[(6*i)+1+v_offset], 
             var_list[(6*i)+2+v_offset],var_list[(6*i)+3+v_offset], var_list[(6*i)+4+v_offset], 
             var_list[(6*i)+5+v_offset]]
-        f_list[(6*i)+f_offset] = solve_ivp(equations_n_side, (points_n_side[i], points_n_side[i+1]),
-            interval_start_values, method = 'BDF').y[0,-1] - var_list[(6*i)+6+v_offset]
-        f_list[(6*i)+1+f_offset] = solve_ivp(equations_n_side, (points_n_side[i], points_n_side[i+1]),
-            interval_start_values, method = 'BDF').y[1,-1] - var_list[(6*i)+7+v_offset]
-        f_list[(6*i)+2+f_offset] = (solve_ivp(equations_n_side, (points_n_side[i], points_n_side[i+1]),
-            interval_start_values, method = 'BDF').y[2,-1] - var_list[(6*i)+8+v_offset])/1000
-        f_list[(6*i)+3+f_offset] = (solve_ivp(equations_n_side, (points_n_side[i], points_n_side[i+1]),
-            interval_start_values, method = 'BDF').y[3,-1] - var_list[(6*i)+9+v_offset])/1000
-        f_list[(6*i)+4+f_offset] = solve_ivp(equations_n_side, (points_n_side[i], points_n_side[i+1]),
-            interval_start_values, method = 'BDF').y[4,-1] - var_list[(6*i)+10+v_offset]
-        f_list[(6*i)+5+f_offset] = solve_ivp(equations_n_side, (points_n_side[i], points_n_side[i+1]),
-            interval_start_values, method = 'BDF').y[5,-1] - var_list[(6*i)+11+v_offset]
+        sol = solve_ivp(equations_n_side, (points_n_side[i], points_n_side[i+1]),
+            interval_start_values, method = 'BDF')
+        f_list[(6*i)+f_offset] = sol.y[0,-1] - var_list[(6*i)+6+v_offset]
+        f_list[(6*i)+1+f_offset] = sol.y[1,-1] - var_list[(6*i)+7+v_offset]
+        f_list[(6*i)+2+f_offset] = (sol.y[2,-1] - var_list[(6*i)+8+v_offset])/100
+        f_list[(6*i)+3+f_offset] = (sol.y[3,-1] - var_list[(6*i)+9+v_offset])/100
+        f_list[(6*i)+4+f_offset] = sol.y[4,-1] - var_list[(6*i)+10+v_offset]
+        f_list[(6*i)+5+f_offset] = sol.y[5,-1] - var_list[(6*i)+11+v_offset]
     #Boundary conditions n-side
     interval_start_values = interval_start_values = [var_list[6*(num_intervals_n_side-1)+v_offset], 
         var_list[6*(num_intervals_p_side-1)+1+v_offset], var_list[6*(num_intervals_n_side-1)+2+v_offset],
@@ -321,7 +299,7 @@ def calculate_f_list(var_list):
         interval_start_values, method = 'BDF').y[0,-1] - v_boundary_n
     f_list[-2] = (solve_ivp(equations_n_side,
         (points_n_side[num_intervals_n_side-1], points_n_side[num_intervals_n_side]), 
-        interval_start_values, method = 'BDF').y[2,-1] - n_boundary_n)/1000
+        interval_start_values, method = 'BDF').y[2,-1] - n_boundary_n)/100
     f_list[-1] = solve_ivp(equations_n_side,
         (points_n_side[num_intervals_n_side-1], points_n_side[num_intervals_n_side]), 
         interval_start_values, method = 'BDF').y[4,-1] - p_boundary_n
@@ -330,7 +308,107 @@ def calculate_f_list(var_list):
 #Solve all necessary equations:
 solution = root(calculate_f_list, var_list, method='hybr') #Print solution for more info
 var_list = solution.x
-     
-    
-    
 
+def plot_solution(var_list, v_app):
+    x_p_side = []
+    v_p_side = []
+    dv_p_side = []
+    n_p_side = []
+    dn_p_side = []
+    p_p_side = []
+    dp_p_side = []
+    
+    for i in range(num_intervals_p_side):
+        interval_start_values = [var_list[6*i], var_list[(6*i)+1], var_list[(6*i)+2],
+            var_list[(6*i)+3], var_list[(6*i)+4], var_list[(6*i)+5]]
+        sol = solve_ivp(equations_p_side, (points_p_side[i], points_p_side[i+1]),
+            interval_start_values, method = 'BDF')
+        for j in range(sol.t.shape[0]):
+            x_p_side.append(sol.t[j])
+            v_p_side.append(sol.y[0,j])
+            dv_p_side.append(sol.y[1,j])
+            n_p_side.append(sol.y[2,j])
+            dn_p_side.append(sol.y[3,j])
+            p_p_side.append(sol.y[4,j])
+            dp_p_side.append(sol.y[5,j])
+            
+    x_n_side = []
+    v_n_side = []
+    dv_n_side = []
+    n_n_side = []
+    p_n_side = []
+    dn_n_side = []
+    dp_n_side = []
+    offset = 6 * num_intervals_p_side
+    
+    for i in range(num_intervals_n_side):
+        interval_start_values = [var_list[(6*i)+offset], var_list[(6*i)+1+offset], 
+            var_list[(6*i)+2+offset], var_list[(6*i)+3+offset], 
+            var_list[(6*i)+4+offset], var_list[(6*i)+5+offset]]
+        sol = solve_ivp(equations_n_side, (points_n_side[i], points_n_side[i+1]),
+            interval_start_values, method = 'BDF')
+        for j in range(sol.t.shape[0]):
+            x_n_side.append(sol.t[j])
+            v_n_side.append(sol.y[0,j])
+            dv_n_side.append(sol.y[1,j])
+            n_n_side.append(sol.y[2,j])
+            dn_n_side.append(sol.y[3,j])
+            p_n_side.append(sol.y[4,j])
+            dp_n_side.append(sol.y[5,j])
+            
+    #Combine p-side and n-side data
+    x_n_side.reverse()
+    v_n_side.reverse()
+    dv_n_side.reverse()
+    n_n_side.reverse()
+    p_n_side.reverse()
+    dn_n_side.reverse()
+    dp_n_side.reverse()
+    
+    final_x = []
+    final_v = []
+    final_electric_field = []
+    final_p = []
+    final_n = []
+    final_dn = []
+    final_dp = []
+    
+    for i in range(len(x_n_side)):
+        x_n_side[i] = (x_n/ldi) - x_n_side[i]
+        final_x.append(x_n_side[i] * ldi)
+        final_v.append(v_n_side[i] * vt)
+        final_electric_field.append(dv_n_side[i] * vt/ldi)
+        final_p.append(p_n_side[i] * NI)
+        final_n.append(n_n_side[i] * NI)
+        final_dp.append(-dp_n_side[i] * NI/ldi)
+        final_dn.append(-dn_n_side[i] * NI/ldi)
+    for i in range(len(x_p_side)):
+        x_p_side[i] = x_p_side[i] + (x_n/ldi)
+        final_x.append(x_p_side[i] * ldi)
+        final_v.append(v_p_side[i] * vt)
+        final_electric_field.append(-dv_p_side[i] * vt/ldi)
+        final_p.append(p_p_side[i] * NI)
+        final_n.append(n_p_side[i] * NI)
+        final_dp.append(dp_p_side[i] * NI/ldi)
+        final_dn.append(dn_p_side[i] * NI/ldi)
+            
+    fig, ax1 = plt.subplots(3)
+    fig.set_figheight(10)
+    fig.set_figwidth(15)
+    
+    ax1[0].plot(final_x, final_p, 'r-', label = 'p')
+    ax1[0].plot(final_x, final_n, label = 'n')
+    ax1[0].legend(loc = 'upper left')
+    ax1[0].set_title('Applied Bias: ' + str(v_app))
+    ax1[0].set_xlabel('Position (nm)')
+    ax1[0].set_ylabel('Electron and Hole Concentrations (cm^-1)')
+    ax1[0].set_yscale('log')
+    ax1[1].plot(final_x, final_v)
+    ax1[1].set_xlabel('Position (nm)')
+    ax1[1].set_ylabel('Electric Potential (V)')
+    ax1[2].plot(final_x, final_electric_field)
+    ax1[2].set_xlabel('Position (nm)')
+    ax1[2].set_ylabel('Electric Field (V/cm)')
+      
+    
+plot_solution(var_list, v_app)
